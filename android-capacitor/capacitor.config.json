@@ -1,0 +1,12 @@
+{
+  "appId": "app.zenith.mobile",
+  "appName": "Zenith",
+  "webDir": "www",
+  "backgroundColor": "#F2F0E7",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

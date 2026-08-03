@@ -1,0 +1,101 @@
+name: Build Zenith (Windows / macOS / Linux / Android)
+
+# How to use this file (no coding needed):
+#   1. Create a free GitHub account and a new repository.
+#   2. Upload this whole "zenith" folder to that repository.
+#   3. Go to the "Actions" tab of your repository and run this workflow
+#      (or just push — it also runs automatically on every push to main).
+#   4. When it finishes (a few minutes), open the run and scroll down to
+#      "Artifacts" to download the Windows .exe, macOS .dmg, Linux .AppImage
+#      and Android .apk — all built for you, for free, by GitHub's servers.
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build Windows installer
+        if: matrix.os == 'windows-latest'
+        working-directory: electron
+        run: npm run build:win
+
+      - name: Build macOS dmg
+        if: matrix.os == 'macos-latest'
+        working-directory: electron
+        run: npm run build:mac
+
+      - name: Build Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: electron
+        run: npm run build:linux
+
+      - name: Upload build result
+        uses: actions/upload-artifact@v4
+        with:
+          name: zenith-desktop-${{ matrix.os }}
+          path: |
+            electron/dist/*.exe
+            electron/dist/*.dmg
+            electron/dist/*.AppImage
+            electron/dist/*.blockmap
+          if-no-files-found: warn
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Capacitor dependencies
+        working-directory: android-capacitor
+        run: npm install
+
+      - name: Add Android platform
+        working-directory: android-capacitor
+        run: npx cap add android
+
+      - name: Sync web assets into Android project
+        working-directory: android-capacitor
+        run: npx cap sync android
+
+      - name: Grant execute permission for gradlew
+        working-directory: android-capacitor/android
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        working-directory: android-capacitor/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zenith-android-apk
+          path: android-capacitor/android/app/build/outputs/apk/debug/*.apk

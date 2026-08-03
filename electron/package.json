@@ -1,0 +1,45 @@
+{
+  "name": "zenith-desktop",
+  "version": "1.0.0",
+  "description": "Zenith — دفترچه‌ی رشد شخصی (وظایف، عادت‌ها، یادداشت‌ها، مالی) — نسخه دسکتاپ",
+  "main": "main.js",
+  "author": "You",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "app.zenith.desktop",
+    "productName": "Zenith",
+    "directories": { "output": "dist", "buildResources": "build-resources" },
+    "files": ["app/**/*", "main.js", "package.json"],
+    "mac": {
+      "icon": "app/icons/icon-512.png",
+      "category": "public.app-category.productivity",
+      "target": ["dmg"]
+    },
+    "win": {
+      "icon": "app/icons/icon-256.png",
+      "target": ["nsis"]
+    },
+    "linux": {
+      "icon": "app/icons/icon-512.png",
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
