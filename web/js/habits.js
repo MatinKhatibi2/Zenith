@@ -1,13 +1,10 @@
 /* =========================================================
-   Z.views.habits — Habit Tracker + Pomodoro + Alarms
+   Z.views.habits — Habit Tracker + Pomodoro + Alarms — bilingual
    Also exports: Z.pomodoro (timer engine), Z.alarmEngine (background checker)
    ========================================================= */
 window.Z = window.Z || {};
 Z.views = Z.views || {};
 
-/* ---------------------------------------------------------
-   Shared helpers
---------------------------------------------------------- */
 function pidH() { return Z.store.getActiveProfileId(); }
 function dataH() { return Z.store.loadData(pidH()); }
 
@@ -16,16 +13,11 @@ function dataH() { return Z.store.loadData(pidH()); }
 --------------------------------------------------------- */
 Z.pomodoro = (function () {
   const U = Z.utils;
-  let onTickUI = null; // set by habits.js when Pomodoro subtab is mounted
+  let onTickUI = null;
 
   let state = {
-    phase: 'focus',        // 'focus' | 'short' | 'long'
-    running: false,
-    remainingMs: 25 * 60000,
-    endTimestamp: null,
-    round: 0,               // completed focus sessions in current cycle
-    linkedTaskId: null,
-    linkedHabitId: null,
+    phase: 'focus', running: false, remainingMs: 25 * 60000, endTimestamp: null,
+    round: 0, linkedTaskId: null, linkedHabitId: null,
   };
 
   function settings() {
@@ -58,7 +50,6 @@ Z.pomodoro = (function () {
     state.remainingMs = phaseDurationMs(state.phase);
   }
   function skip() { completePhase(true); }
-
   function setLink(taskId, habitId) { state.linkedTaskId = taskId; state.linkedHabitId = habitId; }
 
   function completePhase(silent) {
@@ -66,16 +57,14 @@ Z.pomodoro = (function () {
     if (wasFocus && !silent) {
       logSession();
       Z.store.bumpActivity(pidH(), 'pomodoros', U.todayISO(), 1);
+      Z.gamification.checkAndUnlock(pidH());
       playBeep(2);
-      notify('پومودورو تموم شد 🍅', 'وقت یه استراحت کوتاهه');
+      notify('🍅', Z.i18n.t('pomo.focus'));
     }
     if (wasFocus) state.round += 1;
     const s = settings();
-    if (state.phase === 'focus') {
-      state.phase = (state.round % s.roundsBeforeLongBreak === 0) ? 'long' : 'short';
-    } else {
-      state.phase = 'focus';
-    }
+    if (state.phase === 'focus') state.phase = (state.round % s.roundsBeforeLongBreak === 0) ? 'long' : 'short';
+    else state.phase = 'focus';
     state.remainingMs = phaseDurationMs(state.phase);
     state.running = false;
     state.endTimestamp = null;
@@ -85,10 +74,7 @@ Z.pomodoro = (function () {
   function logSession() {
     const d = dataH();
     if (!d) return;
-    d.pomodoro.sessions.push({
-      id: U.genId(), date: U.todayISO(), durationMin: settings().focusMin,
-      linkedTaskId: state.linkedTaskId, linkedHabitId: state.linkedHabitId, ts: Date.now(),
-    });
+    d.pomodoro.sessions.push({ id: U.genId(), date: U.todayISO(), durationMin: settings().focusMin, linkedTaskId: state.linkedTaskId, linkedHabitId: state.linkedHabitId, ts: Date.now() });
     Z.store.touch(pidH());
   }
 
@@ -96,7 +82,7 @@ Z.pomodoro = (function () {
     if (!pidH()) return;
     if (state.running && state.endTimestamp) {
       const remaining = state.endTimestamp - Date.now();
-      if (remaining <= 0) { completePhase(false); }
+      if (remaining <= 0) completePhase(false);
       else { state.remainingMs = remaining; if (onTickUI) onTickUI(); }
     }
   }
@@ -115,7 +101,7 @@ Z.pomodoro = (function () {
         osc.start(t); osc.stop(t + 0.35);
         t += 0.42;
       }
-    } catch (e) { /* audio not available */ }
+    } catch (e) {}
   }
   function ensureNotifPermission() {
     if (!('Notification' in window)) return;
@@ -123,16 +109,14 @@ Z.pomodoro = (function () {
   }
   function notify(title, body) {
     if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      try { new Notification(title, { body, icon: 'icons/icon-192.png' }); } catch(e){}
-    }
+    if (Notification.permission === 'granted') { try { new Notification(title, { body, icon: 'icons/icon-192.png' }); } catch(e){} }
   }
 
   return { get state() { return state; }, settings, phaseDurationMs, start, pause, reset, skip, setLink, tick, setOnTickUI, playBeep, notify, ensureNotifPermission };
 })();
 
 /* ---------------------------------------------------------
-   Z.alarmEngine — background alarm checker (time-of-day reminders)
+   Z.alarmEngine — background alarm checker
 --------------------------------------------------------- */
 Z.alarmEngine = (function () {
   const U = Z.utils;
@@ -148,7 +132,7 @@ Z.alarmEngine = (function () {
     const hm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const minuteKey = U.todayISO() + 'T' + hm;
     if (minuteKey !== lastMinuteKey) { firedThisMinute.clear(); lastMinuteKey = minuteKey; }
-    const dow = Z.utils.isoWeekdayIrIndex(U.todayISO()); // 0=Sat..6=Fri, matches our day-picker order
+    const dow = Z.utils.isoWeekdayIrIndex(U.todayISO());
 
     d.alarms.forEach(a => {
       if (!a.enabled) return;
@@ -157,8 +141,8 @@ Z.alarmEngine = (function () {
       if (firedThisMinute.has(a.id)) return;
       firedThisMinute.add(a.id);
       Z.pomodoro.playBeep(1);
-      Z.pomodoro.notify('⏰ ' + (a.label || 'یادآور'), 'الان وقتشه');
-      Z.utils.toast('⏰ ' + (a.label || 'یادآور'));
+      Z.pomodoro.notify('⏰ ' + (a.label || Z.i18n.t('alarms.newTitle')), Z.i18n.t('common.today'));
+      Z.utils.toast('⏰ ' + (a.label || Z.i18n.t('alarms.newTitle')));
     });
   }
   return { tick };
@@ -169,21 +153,23 @@ Z.alarmEngine = (function () {
 --------------------------------------------------------- */
 Z.views.habits = (function () {
   const U = Z.utils;
+  const T = Z.i18n.t;
   let sub = 'habits';
   const HABIT_ICONS = ['💧','📚','🏃','🧘','🍎','😴','✍️','🎯','🚭','💪','🧹','🎨','🎵','☀️','🚴','🥗'];
   const HABIT_COLORS = ['#2F5D50','#C9962E','#3E6E8E','#A8452F','#4C7F6E','#B07E1F'];
-  const DOW_LABELS = ['ش','ی','د','س','چ','پ','ج']; // 0=Sat..6=Fri
+  const DOW_LABELS_KEY = 'cal.weekdaysShort';
 
   function pid() { return Z.store.getActiveProfileId(); }
   function data() { return Z.store.loadData(pid()); }
   function save() { Z.store.touch(pid()); }
+  function dowLabels() { return T(DOW_LABELS_KEY).split(','); }
 
   function render(root) {
     root.innerHTML = `
       <div class="filter-tabs" style="margin-bottom:18px">
-        <div class="filter-tab ${sub==='habits'?'active':''}" data-sub="habits">${U.icon('habit')} عادت‌ها</div>
-        <div class="filter-tab ${sub==='pomodoro'?'active':''}" data-sub="pomodoro">🍅 پومودورو</div>
-        <div class="filter-tab ${sub==='alarms'?'active':''}" data-sub="alarms">${U.icon('bell')} یادآورها</div>
+        <div class="filter-tab ${sub==='habits'?'active':''}" data-sub="habits">${U.icon('habit')} ${T('habits.tabHabits')}</div>
+        <div class="filter-tab ${sub==='pomodoro'?'active':''}" data-sub="pomodoro">🍅 ${T('habits.tabPomodoro')}</div>
+        <div class="filter-tab ${sub==='alarms'?'active':''}" data-sub="alarms">${U.icon('bell')} ${T('habits.tabAlarms')}</div>
       </div>
       <div id="habit-sub-body"></div>
     `;
@@ -199,7 +185,7 @@ Z.views.habits = (function () {
     if (habit.frequency !== 'daily') return null;
     let streak = 0;
     let cursor = U.todayISO();
-    if (!habit.checkins[cursor]) cursor = U.isoAddDays(cursor, -1); // grace: today not yet done doesn't zero the streak
+    if (!habit.checkins[cursor]) cursor = U.isoAddDays(cursor, -1);
     while (habit.checkins[cursor]) { streak++; cursor = U.isoAddDays(cursor, -1); }
     return streak;
   }
@@ -208,7 +194,7 @@ Z.views.habits = (function () {
     let count = 0;
     for (let i = 0; i < 7; i++) {
       const iso = U.isoAddDays(today, -i);
-      if (U.isoWeekdayIrIndex(iso) === 0 && i !== 0) break; // stop once we cross into previous week (Saturday start)
+      if (U.isoWeekdayIrIndex(iso) === 0 && i !== 0) break;
       if (habit.checkins[iso]) count++;
     }
     return count;
@@ -218,15 +204,15 @@ Z.views.habits = (function () {
     const d = data();
     root.innerHTML = `
       <div class="flex-between" style="margin-bottom:14px">
-        <div class="text-muted" style="font-size:12.5px">${U.faNum(d.habits.length)} عادت فعال</div>
-        <button class="btn btn-primary btn-sm" id="btn-add-habit">${U.icon('plus')} عادت جدید</button>
+        <div class="text-muted" style="font-size:12.5px">${U.faNum(d.habits.length)} ${T('habits.activeCount')}</div>
+        <button class="btn btn-primary btn-sm" id="btn-add-habit">${U.icon('plus')} ${T('habits.new')}</button>
       </div>
       <div class="grid grid-2" id="habit-cards"></div>
     `;
     root.querySelector('#btn-add-habit').onclick = () => openHabitModal();
     const holder = root.querySelector('#habit-cards');
     if (d.habits.length === 0) {
-      holder.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${U.icon('habit')}<div class="empty-state-title">هنوز عادتی ثبت نکردی</div><div>یه عادت کوچیک رو امروز شروع کن</div></div>`;
+      holder.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${U.icon('habit')}<div class="empty-state-title">${T('habits.emptyTitle')}</div><div>${T('habits.emptySub')}</div></div>`;
       return;
     }
     holder.innerHTML = d.habits.map(h => {
@@ -245,13 +231,13 @@ Z.views.habits = (function () {
             <div class="habit-icon-badge" style="background:${h.color}22">${h.icon}</div>
             <div>
               <div style="font-weight:800;font-size:14px">${U.escapeHtml(h.name)}</div>
-              <div class="text-muted" style="font-size:11px">${h.frequency==='daily' ? 'روزانه' : `${U.faNum(h.targetPerWeek)} بار در هفته`}</div>
+              <div class="text-muted" style="font-size:11px">${h.frequency==='daily' ? T('habits.daily') : `${U.faNum(h.targetPerWeek)} ${T('habits.timesPerWeek')}`}</div>
             </div>
           </div>
           ${streak != null ? `<div class="streak-tag">${U.icon('flame')} ${U.faNum(streak)}</div>` : `<div class="streak-tag">${U.faNum(weeklyProgress(h))}/${U.faNum(h.targetPerWeek)}</div>`}
         </div>
         <div class="heat-grid" style="grid-template-columns:repeat(14,1fr)">${heat.join('')}</div>
-        <button class="checkin-btn ${doneToday?'done':''}" data-id="${h.id}">${doneToday ? U.icon('check')+' امروز ثبت شد' : 'ثبت برای امروز'}</button>
+        <button class="checkin-btn ${doneToday?'done':''}" data-id="${h.id}">${doneToday ? U.icon('check')+' '+T('habits.checkedToday') : T('habits.checkin')}</button>
       </div>`;
     }).join('');
 
@@ -274,36 +260,36 @@ Z.views.habits = (function () {
     Z.store.bumpActivity(pid(), 'habits', today, was ? -1 : 1);
     save();
     Z.app.refreshView();
-    if (!was) U.toast('آفرین! ثبت شد 🌱');
+    if (!was) { U.toast(T('habits.loggedToast')); Z.gamification.checkAndUnlock(pid()); }
   }
 
   function openHabitModal(id) {
     const d = data();
     const h = id ? d.habits.find(h => h.id === id) : { id:null, name:'', icon:HABIT_ICONS[0], color:HABIT_COLORS[0], frequency:'daily', targetPerWeek:3, checkins:{} };
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">${id?'ویرایش عادت':'عادت جدید'}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
-      <div class="field"><label>اسم عادت</label><input class="input" id="f-name" value="${U.escapeHtml(h.name)}" placeholder="مثلاً نوشتن روزانه"></div>
-      <div class="field"><label>آیکون</label>
+      <div class="modal-head"><div class="modal-title">${id?T('habits.editTitle'):T('habits.newTitle')}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
+      <div class="field"><label>${T('habits.nameLabel')}</label><input class="input" id="f-name" value="${U.escapeHtml(h.name)}" placeholder="${T('habits.namePlaceholder')}"></div>
+      <div class="field"><label>${T('habits.iconLabel')}</label>
         <div class="chip-select" id="f-icons">${HABIT_ICONS.map(ic => `<div class="chip ${h.icon===ic?'selected':''}" data-icon="${ic}" style="font-size:16px">${ic}</div>`).join('')}</div>
       </div>
-      <div class="field"><label>رنگ</label>
+      <div class="field"><label>${T('habits.colorLabel')}</label>
         <div class="chip-select" id="f-colors">${HABIT_COLORS.map(c => `<div class="chip" data-color="${c}" style="background:${c};width:26px;height:26px;padding:0;border-color:${c};${h.color===c?'box-shadow:0 0 0 2px var(--surface),0 0 0 4px '+c:''}"></div>`).join('')}</div>
       </div>
-      <div class="field"><label>دوره</label>
+      <div class="field"><label>${T('habits.freqLabel')}</label>
         <div class="chip-select" id="f-freq">
-          <div class="chip ${h.frequency==='daily'?'selected':''}" data-f="daily">روزانه</div>
-          <div class="chip ${h.frequency==='weekly'?'selected':''}" data-f="weekly">تعداد مشخص در هفته</div>
+          <div class="chip ${h.frequency==='daily'?'selected':''}" data-f="daily">${T('habits.freqDaily')}</div>
+          <div class="chip ${h.frequency==='weekly'?'selected':''}" data-f="weekly">${T('habits.freqWeekly')}</div>
         </div>
       </div>
       <div class="field" id="f-target-wrap" style="${h.frequency==='weekly'?'':'display:none'}">
-        <label>چند بار در هفته؟</label>
+        <label>${T('habits.targetLabel')}</label>
         <input class="input" type="number" min="1" max="7" id="f-target" value="${h.targetPerWeek||3}">
       </div>
       <div class="modal-actions">
-        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} حذف</button>` : ''}
+        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} ${T('common.delete')}</button>` : ''}
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="btn-cancel">انصراف</button>
-        <button class="btn btn-primary" id="btn-save">ذخیره</button>
+        <button class="btn btn-ghost" id="btn-cancel">${T('common.cancel')}</button>
+        <button class="btn btn-primary" id="btn-save">${T('common.save')}</button>
       </div>
     `);
     let selIcon = h.icon, selColor = h.color, selFreq = h.frequency;
@@ -321,17 +307,17 @@ Z.views.habits = (function () {
     overlay.querySelector('#m-close').onclick = () => U.closeModal(overlay);
     overlay.querySelector('#btn-cancel').onclick = () => U.closeModal(overlay);
     if (id) overlay.querySelector('#btn-delete').onclick = () => {
-      const dd = data(); dd.habits = dd.habits.filter(x=>x.id!==id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast('عادت حذف شد');
+      const dd = data(); dd.habits = dd.habits.filter(x=>x.id!==id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast(T('habits.deleted'));
     };
     overlay.querySelector('#btn-save').onclick = () => {
       const name = overlay.querySelector('#f-name').value.trim();
-      if (!name) { U.toast('اسم عادت رو وارد کن'); return; }
+      if (!name) { U.toast(T('habits.enterName')); return; }
       const payload = { name, icon:selIcon, color:selColor, frequency:selFreq, targetPerWeek: +overlay.querySelector('#f-target').value || 3 };
       const dd = data();
       if (id) Object.assign(h, payload);
       else dd.habits.push({ id:U.genId(), checkins:{}, createdAt:Date.now(), ...payload });
       save(); U.closeModal(overlay); Z.app.refreshView();
-      U.toast(id?'عادت به‌روزرسانی شد':'عادت اضافه شد');
+      U.toast(id?T('habits.updated'):T('habits.added'));
     };
   }
 
@@ -342,17 +328,36 @@ Z.views.habits = (function () {
     const s = String(total%60).padStart(2,'0');
     return U.faNum(m) + ':' + U.faNum(s);
   }
+
+  function maybeShowPomodoroIntro() {
+    const d = data();
+    if (d.settings.pomodoroIntroSeen) return;
+    d.settings.pomodoroIntroSeen = true;
+    Z.store.touch(pid());
+    const overlay = U.openModal(`
+      <div style="text-align:center;padding:6px 4px 0">
+        <div style="font-size:46px;margin-bottom:6px">🍅</div>
+        <div class="modal-title" style="margin-bottom:10px">${T('pomo.introTitle')}</div>
+        <p style="font-size:13.5px;color:var(--text-muted);line-height:1.9;text-align:start">${T('pomo.introBody')}</p>
+        <button class="btn btn-accent btn-block" id="btn-intro-ok" style="margin-top:16px">${T('pomo.introCta')}</button>
+      </div>
+    `);
+    overlay.querySelector('#btn-intro-ok').onclick = () => U.closeModal(overlay);
+  }
+
   function renderPomodoro(root) {
+    maybeShowPomodoroIntro();
     const d = data();
     const st = Z.pomodoro.state;
     const dur = Z.pomodoro.phaseDurationMs(st.phase);
     const pct = 1 - (st.remainingMs / dur);
     const R = 100, C = 2*Math.PI*R;
-    const phaseLabel = { focus:'زمان تمرکز', short:'استراحت کوتاه', long:'استراحت بلند' }[st.phase];
+    const phaseLabel = { focus:T('pomo.focus'), short:T('pomo.short'), long:T('pomo.long') }[st.phase];
     const todaysSessions = d.pomodoro.sessions.filter(s => s.date === U.todayISO()).length;
 
     root.innerHTML = `
       <div class="card pomo-wrap">
+        <button class="icon-btn" id="btn-pomo-info" style="align-self:flex-end;margin-bottom:-8px">❔</button>
         <div class="pomo-ring-holder">
           <svg viewBox="0 0 220 220">
             <circle class="pomo-ring-bg" cx="110" cy="110" r="${R}"></circle>
@@ -371,14 +376,14 @@ Z.views.habits = (function () {
           <button class="pomo-round-btn" id="btn-toggle">${U.icon(st.running?'pause':'play')}</button>
           <button class="pomo-round-btn secondary" id="btn-skip">${U.icon('sparkle')}</button>
         </div>
-        <div class="text-muted" style="font-size:12.5px">${U.faNum(todaysSessions)} پومودورو امروز</div>
+        <div class="text-muted" style="font-size:12.5px">${U.faNum(todaysSessions)} ${T('pomo.todayCount')}</div>
       </div>
       <div class="card" style="margin-top:16px">
         <div class="flex-between" style="margin-bottom:10px">
-          <div class="card-title" style="margin-bottom:0">تنظیمات تایمر</div>
-          <button class="btn btn-ghost btn-sm" id="btn-pomo-settings">${U.icon('settings')} ویرایش زمان‌ها</button>
+          <div class="card-title" style="margin-bottom:0">${T('pomo.settingsTitle')}</div>
+          <button class="btn btn-ghost btn-sm" id="btn-pomo-settings">${U.icon('settings')} ${T('pomo.editTimes')}</button>
         </div>
-        <div class="card-sub">تمرکز ${U.faNum(Z.pomodoro.settings().focusMin)} دقیقه · استراحت کوتاه ${U.faNum(Z.pomodoro.settings().shortBreakMin)} دقیقه · استراحت بلند ${U.faNum(Z.pomodoro.settings().longBreakMin)} دقیقه</div>
+        <div class="card-sub">${T('pomo.summary', { focus:U.faNum(Z.pomodoro.settings().focusMin), short:U.faNum(Z.pomodoro.settings().shortBreakMin), long:U.faNum(Z.pomodoro.settings().longBreakMin) })}</div>
       </div>
     `;
     Z.pomodoro.setOnTickUI(() => { if (root.isConnected) renderPomodoro(root); });
@@ -386,21 +391,24 @@ Z.views.habits = (function () {
     root.querySelector('#btn-reset').onclick = () => { Z.pomodoro.reset(); renderPomodoro(root); };
     root.querySelector('#btn-skip').onclick = () => { Z.pomodoro.skip(); renderPomodoro(root); };
     root.querySelector('#btn-pomo-settings').onclick = () => openPomoSettingsModal(root);
+    root.querySelector('#btn-pomo-info').onclick = () => {
+      const d2 = data(); d2.settings.pomodoroIntroSeen = false; Z.store.touch(pid()); maybeShowPomodoroIntro();
+    };
   }
 
   function openPomoSettingsModal(pomoRoot) {
     const s = Z.pomodoro.settings();
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">تنظیمات پومودورو</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
+      <div class="modal-head"><div class="modal-title">${T('pomo.modalTitle')}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
       <div class="input-row">
-        <div class="field" style="flex:1"><label>تمرکز (دقیقه)</label><input class="input" type="number" min="1" id="f-focus" value="${s.focusMin}"></div>
-        <div class="field" style="flex:1"><label>استراحت کوتاه</label><input class="input" type="number" min="1" id="f-short" value="${s.shortBreakMin}"></div>
+        <div class="field" style="flex:1"><label>${T('pomo.focusMin')}</label><input class="input" type="number" min="1" id="f-focus" value="${s.focusMin}"></div>
+        <div class="field" style="flex:1"><label>${T('pomo.shortMin')}</label><input class="input" type="number" min="1" id="f-short" value="${s.shortBreakMin}"></div>
       </div>
       <div class="input-row">
-        <div class="field" style="flex:1"><label>استراحت بلند</label><input class="input" type="number" min="1" id="f-long" value="${s.longBreakMin}"></div>
-        <div class="field" style="flex:1"><label>دور تا استراحت بلند</label><input class="input" type="number" min="1" id="f-rounds" value="${s.roundsBeforeLongBreak}"></div>
+        <div class="field" style="flex:1"><label>${T('pomo.longMin')}</label><input class="input" type="number" min="1" id="f-long" value="${s.longBreakMin}"></div>
+        <div class="field" style="flex:1"><label>${T('pomo.roundsLabel')}</label><input class="input" type="number" min="1" id="f-rounds" value="${s.roundsBeforeLongBreak}"></div>
       </div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel">انصراف</button><button class="btn btn-primary" id="btn-save">ذخیره</button></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel">${T('common.cancel')}</button><button class="btn btn-primary" id="btn-save">${T('common.save')}</button></div>
     `);
     overlay.querySelector('#m-close').onclick = () => U.closeModal(overlay);
     overlay.querySelector('#btn-cancel').onclick = () => U.closeModal(overlay);
@@ -416,7 +424,7 @@ Z.views.habits = (function () {
       Z.pomodoro.reset();
       U.closeModal(overlay);
       renderPomodoro(pomoRoot);
-      U.toast('تنظیمات ذخیره شد');
+      U.toast(T('pomo.settingsSaved'));
     };
   }
 
@@ -425,20 +433,21 @@ Z.views.habits = (function () {
     const d = data();
     root.innerHTML = `
       <div class="flex-between" style="margin-bottom:14px">
-        <div class="text-muted" style="font-size:12.5px">یادآورها فقط وقتی برنامه بازه فعال می‌مونن</div>
-        <button class="btn btn-primary btn-sm" id="btn-add-alarm">${U.icon('plus')} یادآور جدید</button>
+        <div class="text-muted" style="font-size:12.5px">${T('alarms.hint')}</div>
+        <button class="btn btn-primary btn-sm" id="btn-add-alarm">${U.icon('plus')} ${T('alarms.new')}</button>
       </div>
       <div id="alarm-list"></div>
     `;
     root.querySelector('#btn-add-alarm').onclick = () => openAlarmModal();
     const holder = root.querySelector('#alarm-list');
-    if (d.alarms.length === 0) { holder.innerHTML = `<div class="empty-state">${U.icon('bell')}<div class="empty-state-title">یادآوری تنظیم نشده</div></div>`; return; }
+    if (d.alarms.length === 0) { holder.innerHTML = `<div class="empty-state">${U.icon('bell')}<div class="empty-state-title">${T('alarms.emptyTitle')}</div></div>`; return; }
+    const labels = dowLabels();
     holder.innerHTML = d.alarms.map(a => `
       <div class="alarm-row" data-id="${a.id}">
         <div class="alarm-time">${U.faTime(a.time)}</div>
         <div class="alarm-meta">
-          <div class="alarm-label">${U.escapeHtml(a.label||'یادآور')}</div>
-          <div class="alarm-days">${a.days && a.days.length===7 ? 'هر روز' : (a.days||[]).map(i=>DOW_LABELS[i]).join(' ، ') || 'یک‌بار'}</div>
+          <div class="alarm-label">${U.escapeHtml(a.label||T('alarms.newTitle'))}</div>
+          <div class="alarm-days">${a.days && a.days.length===7 ? T('alarms.everyDay') : (a.days||[]).map(i=>labels[i]).join(' ، ') || T('alarms.once')}</div>
         </div>
         <label class="switch"><input type="checkbox" data-id="${a.id}" ${a.enabled?'checked':''}><span class="switch-track"></span></label>
         <button class="icon-btn edit-alarm" data-id="${a.id}" style="width:32px;height:32px">${U.icon('edit')}</button>
@@ -454,18 +463,19 @@ Z.views.habits = (function () {
   function openAlarmModal(id) {
     const d = data();
     const a = id ? d.alarms.find(a=>a.id===id) : { id:null, time:'08:00', label:'', days:[0,1,2,3,4,5,6], enabled:true };
+    const labels = dowLabels();
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">${id?'ویرایش یادآور':'یادآور جدید'}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
-      <div class="field"><label>ساعت</label><input class="input" type="time" id="f-time" value="${a.time}"></div>
-      <div class="field"><label>عنوان</label><input class="input" id="f-label" value="${U.escapeHtml(a.label)}" placeholder="مثلاً نوشتن دفترچه"></div>
-      <div class="field"><label>روزها</label>
-        <div class="chip-select" id="f-days">${DOW_LABELS.map((lb,i) => `<div class="chip ${a.days.includes(i)?'selected':''}" data-i="${i}">${lb}</div>`).join('')}</div>
+      <div class="modal-head"><div class="modal-title">${id?T('alarms.editTitle'):T('alarms.newTitle')}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
+      <div class="field"><label>${T('alarms.timeLabel')}</label><input class="input" type="time" id="f-time" value="${a.time}"></div>
+      <div class="field"><label>${T('alarms.titleLabel')}</label><input class="input" id="f-label" value="${U.escapeHtml(a.label)}" placeholder="${T('alarms.titlePlaceholder')}"></div>
+      <div class="field"><label>${T('alarms.daysLabel')}</label>
+        <div class="chip-select" id="f-days">${labels.map((lb,i) => `<div class="chip ${a.days.includes(i)?'selected':''}" data-i="${i}">${lb}</div>`).join('')}</div>
       </div>
       <div class="modal-actions">
-        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} حذف</button>` : ''}
+        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} ${T('common.delete')}</button>` : ''}
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="btn-cancel">انصراف</button>
-        <button class="btn btn-primary" id="btn-save">ذخیره</button>
+        <button class="btn btn-ghost" id="btn-cancel">${T('common.cancel')}</button>
+        <button class="btn btn-primary" id="btn-save">${T('common.save')}</button>
       </div>
     `);
     let selDays = [...a.days];
@@ -486,7 +496,7 @@ Z.views.habits = (function () {
       else dd.alarms.push({ id:U.genId(), ...payload });
       save(); U.closeModal(overlay); Z.app.refreshView();
       Z.pomodoro.ensureNotifPermission();
-      U.toast(id?'یادآور به‌روزرسانی شد':'یادآور اضافه شد');
+      U.toast(id?T('alarms.updated'):T('alarms.added'));
     };
   }
 

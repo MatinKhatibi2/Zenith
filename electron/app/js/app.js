@@ -1,25 +1,28 @@
 /* =========================================================
-   Z.app — shell, router, navigation, global background timers
+   Z.app — shell, router, navigation, global background timers — bilingual
    ========================================================= */
 window.Z = window.Z || {};
 
 Z.app = (function () {
   const U = Z.utils;
+  const T = Z.i18n.t;
   let route = 'dashboard';
   let globalTimersStarted = false;
 
-  const NAV_ITEMS = [
-    { id:'dashboard', label:'خانه', icon:'home' },
-    { id:'tasks', label:'وظایف', icon:'tasks' },
-    { id:'habits', label:'عادت‌ها', icon:'habit' },
-    { id:'notes', label:'یادداشت‌ها', icon:'notes' },
-    { id:'finance', label:'مالی', icon:'finance' },
-    { id:'reports', label:'گزارش‌ها', icon:'reports' },
-    { id:'ai', label:'دستیار هوشمند', icon:'ai' },
-    { id:'settings', label:'تنظیمات', icon:'settings' },
-  ];
-  const MOBILE_TABS = ['dashboard','tasks','habits','finance'];
-  const TITLES = { dashboard:'خانه', tasks:'وظایف', habits:'عادت‌ها', notes:'یادداشت‌ها', finance:'مالی', reports:'گزارش‌ها', ai:'دستیار هوشمند', settings:'تنظیمات' };
+  function navItems() {
+    return [
+      { id:'dashboard', label:T('nav.dashboard'), icon:'home' },
+      { id:'tasks', label:T('nav.tasks'), icon:'tasks' },
+      { id:'calendar', label:T('nav.calendar'), icon:'calendar' },
+      { id:'habits', label:T('nav.habits'), icon:'habit' },
+      { id:'notes', label:T('nav.notes'), icon:'notes' },
+      { id:'finance', label:T('nav.finance'), icon:'finance' },
+      { id:'reports', label:T('nav.reports'), icon:'reports' },
+      { id:'ai', label:T('nav.ai'), icon:'ai' },
+      { id:'settings', label:T('nav.settings'), icon:'settings' },
+    ];
+  }
+  const MOBILE_TABS = ['dashboard','tasks','calendar','habits'];
 
   function pid() { return Z.store.getActiveProfileId(); }
   function profile() { return Z.store.getProfiles().find(p => p.id === pid()); }
@@ -36,19 +39,31 @@ Z.app = (function () {
 
   function renderShell(root) {
     const p = profile();
+    const d = Z.store.loadData(pid());
+    const xp = Z.gamification.xpProgress(d.gamification.xp);
+    const items = navItems();
     root.innerHTML = `
       <div class="app-shell">
         <nav class="sidenav">
           <div class="brand">
             <img src="icons/icon-72.png" alt="Zenith">
-            <div><div class="brand-name">Zenith</div><div class="brand-sub">دفترچه‌ی رشد شخصی</div></div>
+            <div><div class="brand-name">${T('app.name')}</div><div class="brand-sub">${T('app.tagline')}</div></div>
           </div>
-          ${NAV_ITEMS.map(n => `<button class="nav-item" data-route="${n.id}">${U.icon(n.icon)}<span>${n.label}</span></button>`).join('')}
+          ${items.map(n => `<button class="nav-item" data-route="${n.id}">${U.icon(n.icon)}<span>${n.label}</span></button>`).join('')}
           <div class="nav-spacer"></div>
           <div class="nav-foot">
+            <div style="padding:0 10px 8px">
+              <div class="flex-between" style="font-size:10.5px;color:var(--nav-text-dim);margin-bottom:4px">
+                <span>${T('gam.level')} ${U.faNum(xp.level)}</span>
+                <span>${U.faNum(xp.xpToNext)} → ${T('gam.level')} ${U.faNum(xp.level+1)}</span>
+              </div>
+              <div class="budget-bar-track" style="height:6px;background:rgba(255,255,255,0.12)">
+                <div class="budget-bar-fill xp-fill" style="width:${Math.round(xp.pct*100)}%"></div>
+              </div>
+            </div>
             <div class="profile-chip" id="btn-profile-chip">
-              <div class="profile-avatar" style="background:${p?p.avatarColor:'var(--brand)'}">${p?p.name.charAt(0):'؟'}</div>
-              <div class="profile-meta"><div class="profile-name">${U.escapeHtml(p?p.name:'')}</div><div class="profile-sub">مشاهده و تعویض</div></div>
+              <div class="profile-avatar ${xp.level>=5?'level-glow':''}" style="background:${p?p.avatarColor:'var(--brand)'}">${p?p.name.charAt(0):'?'}</div>
+              <div class="profile-meta"><div class="profile-name">${U.escapeHtml(p?p.name:'')}</div><div class="profile-sub">${T('nav.viewSwitch')}</div></div>
             </div>
           </div>
         </nav>
@@ -56,14 +71,15 @@ Z.app = (function () {
           <div class="topbar">
             <div class="topbar-title" id="topbar-title"></div>
             <div class="topbar-actions">
+              <button class="icon-btn" id="btn-lang-toggle" style="font-size:11px;font-weight:800;width:auto;padding:0 10px">${Z.i18n.isFa()?'EN':'فا'}</button>
               <button class="icon-btn" id="btn-theme-toggle"></button>
             </div>
           </div>
           <div class="view" id="view-content"></div>
         </div>
         <div class="tabbar">
-          ${MOBILE_TABS.map(id => `<button class="tab-item" data-route="${id}">${U.icon(NAV_ITEMS.find(n=>n.id===id).icon)}<span>${TITLES[id]}</span></button>`).join('')}
-          <button class="tab-item" data-route="__more">${U.icon('dots')}<span>بیشتر</span></button>
+          ${MOBILE_TABS.map(id => `<button class="tab-item" data-route="${id}">${U.icon(items.find(n=>n.id===id).icon)}<span>${items.find(n=>n.id===id).label}</span></button>`).join('')}
+          <button class="tab-item" data-route="__more">${U.icon('dots')}<span>${T('nav.more')}</span></button>
         </div>
         <button class="fab" id="fab-add">${U.icon('plus')}</button>
       </div>
@@ -74,17 +90,18 @@ Z.app = (function () {
     }));
     root.querySelector('#btn-profile-chip').addEventListener('click', () => navigate('settings'));
     root.querySelector('#btn-theme-toggle').addEventListener('click', toggleTheme);
+    root.querySelector('#btn-lang-toggle').addEventListener('click', () => { Z.i18n.setLang(Z.i18n.isFa() ? 'en' : 'fa'); boot(); });
     root.querySelector('#fab-add').addEventListener('click', handleFab);
     refreshThemeIcon();
   }
 
   function openMoreSheet() {
-    const items = NAV_ITEMS.filter(n => !MOBILE_TABS.includes(n.id));
+    const items = navItems().filter(n => !MOBILE_TABS.includes(n.id));
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">بیشتر</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
+      <div class="modal-head"><div class="modal-title">${T('nav.more')}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
       <div style="display:flex;flex-direction:column;gap:4px">
         ${items.map(n => `<button class="nav-item" style="color:var(--text)" data-route="${n.id}">${U.icon(n.icon)}<span>${n.label}</span></button>`).join('')}
-        <button class="nav-item" style="color:var(--danger)" id="m-logout">${U.icon('logout')}<span>تعویض پروفایل</span></button>
+        <button class="nav-item" style="color:var(--danger)" id="m-logout">${U.icon('logout')}<span>${T('nav.switchProfile')}</span></button>
       </div>
     `);
     overlay.querySelector('#m-close').onclick = () => U.closeModal(overlay);
@@ -116,7 +133,8 @@ Z.app = (function () {
     route = r;
     document.querySelectorAll('[data-route]').forEach(el => el.classList.toggle('active', el.dataset.route === r));
     const title = document.getElementById('topbar-title');
-    if (title) title.textContent = TITLES[r] || '';
+    const items = navItems();
+    if (title) title.textContent = (items.find(n=>n.id===r) || {}).label || '';
     const content = document.getElementById('view-content');
     if (content && Z.views[r]) {
       content.classList.remove('view-enter');

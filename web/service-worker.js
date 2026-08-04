@@ -1,14 +1,17 @@
-const CACHE_NAME = 'zenith-cache-v1';
+const CACHE_NAME = 'zenith-cache-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './js/i18n.js',
   './js/utils.js',
   './js/storage.js',
+  './js/gamification.js',
   './js/charts.js',
   './js/auth.js',
   './js/tasks.js',
   './js/habits.js',
+  './js/calendar.js',
   './js/notes.js',
   './js/finance.js',
   './js/dashboard.js',

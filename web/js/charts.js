@@ -25,8 +25,9 @@ Z.charts = (function () {
   function chartLibAvailable() { return typeof Chart !== 'undefined'; }
   function offlineFallback(canvasId) {
     const ctx = document.getElementById(canvasId);
+    const msg = (window.Z && Z.i18n) ? Z.i18n.t('fin.needsInternet') : 'This chart needs an internet connection';
     if (ctx && ctx.parentElement) {
-      ctx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12px;text-align:center;padding:12px">نمودار نیاز به اتصال اینترنت (برای بارگذاری Chart.js) دارد</div>';
+      ctx.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12px;text-align:center;padding:12px">${msg}</div>`;
     }
   }
 

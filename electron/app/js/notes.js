@@ -1,11 +1,12 @@
 /* =========================================================
-   Z.views.notes — Notebook with search, tags, pin, simple rich text
+   Z.views.notes — Notebook with search, tags, pin, simple rich text — bilingual
    ========================================================= */
 window.Z = window.Z || {};
 Z.views = Z.views || {};
 
 Z.views.notes = (function () {
   const U = Z.utils;
+  const T = Z.i18n.t;
   let q = '', activeTag = null;
 
   function pid() { return Z.store.getActiveProfileId(); }
@@ -26,13 +27,13 @@ Z.views.notes = (function () {
     const tags = allTags();
     root.innerHTML = `
       <div class="notes-toolbar">
-        <input class="input" id="note-search" placeholder="جستجو در یادداشت‌ها…" value="${U.escapeHtml(q)}" style="max-width:260px">
+        <input class="input" id="note-search" placeholder="${T('notes.search')}" value="${U.escapeHtml(q)}" style="max-width:260px">
         <div class="chip-select" id="tag-filters">
-          <div class="chip ${activeTag===null?'selected':''}" data-tag="">همه</div>
+          <div class="chip ${activeTag===null?'selected':''}" data-tag="">${T('common.all')}</div>
           ${tags.map(t => `<div class="chip ${activeTag===t?'selected':''}" data-tag="${U.escapeHtml(t)}">${U.escapeHtml(t)}</div>`).join('')}
         </div>
         <div style="flex:1"></div>
-        <button class="btn btn-primary btn-sm" id="btn-add-note">${U.icon('plus')} یادداشت جدید</button>
+        <button class="btn btn-primary btn-sm" id="btn-add-note">${U.icon('plus')} ${T('notes.new')}</button>
       </div>
       <div class="grid grid-3" id="notes-grid"></div>
     `;
@@ -51,10 +52,10 @@ Z.views.notes = (function () {
       return matchQ && matchTag;
     }).sort((a,b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
 
-    if (list.length === 0) { holder.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${U.icon('notes')}<div class="empty-state-title">یادداشتی پیدا نشد</div><div>یه یادداشت جدید بنویس</div></div>`; return; }
+    if (list.length === 0) { holder.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${U.icon('notes')}<div class="empty-state-title">${T('notes.emptyTitle')}</div><div>${T('notes.emptySub')}</div></div>`; return; }
     holder.innerHTML = list.map(n => `
       <div class="card note-card ${n.pinned?'pinned':''}" data-id="${n.id}">
-        <div class="note-card-title">${U.escapeHtml(n.title || 'بدون عنوان')}</div>
+        <div class="note-card-title">${U.escapeHtml(n.title || T('notes.untitled'))}</div>
         <div class="note-card-body">${U.escapeHtml(stripHtml(n.bodyHtml))}</div>
         <div class="note-card-tags">${(n.tags||[]).map(t => `<span class="tag-pill">${U.escapeHtml(t)}</span>`).join('')}</div>
       </div>
@@ -66,27 +67,27 @@ Z.views.notes = (function () {
     const d = data();
     const n = id ? d.notes.find(n => n.id === id) : { id:null, title:'', bodyHtml:'', tags:[], pinned:false };
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">${id?'ویرایش یادداشت':'یادداشت جدید'}</div>
+      <div class="modal-head"><div class="modal-title">${id?T('notes.editTitle'):T('notes.newTitle')}</div>
         <div class="flex-gap">
-          <button class="icon-btn" id="btn-pin" title="سنجاق">${U.icon('pin')}</button>
+          <button class="icon-btn" id="btn-pin" title="pin">${U.icon('pin')}</button>
           <button class="icon-btn" id="m-close">${U.icon('x')}</button>
         </div>
       </div>
-      <input class="input" id="f-title" value="${U.escapeHtml(n.title)}" placeholder="عنوان یادداشت" style="font-weight:800;font-size:16px;margin-bottom:10px">
+      <input class="input" id="f-title" value="${U.escapeHtml(n.title)}" placeholder="${T('notes.titlePlaceholder')}" style="font-weight:800;font-size:16px;margin-bottom:10px">
       <div class="editor-toolbar">
-        <button data-cmd="bold" title="ضخیم"><b>B</b></button>
-        <button data-cmd="italic" title="کج"><i>I</i></button>
-        <button data-cmd="insertUnorderedList" title="لیست">•≡</button>
-        <button data-cmd="insertOrderedList" title="لیست شماره‌دار">۱≡</button>
+        <button data-cmd="bold" title="bold"><b>B</b></button>
+        <button data-cmd="italic" title="italic"><i>I</i></button>
+        <button data-cmd="insertUnorderedList" title="list">•≡</button>
+        <button data-cmd="insertOrderedList" title="numbered list">۱≡</button>
       </div>
       <div class="note-editor-area" id="f-body" contenteditable="true">${n.bodyHtml || ''}</div>
-      <div class="field" style="margin-top:14px"><label>برچسب‌ها (با کاما جدا کن)</label>
-        <input class="input" id="f-tags" value="${U.escapeHtml((n.tags||[]).join('، '))}" placeholder="مثلاً کار، ایده"></div>
+      <div class="field" style="margin-top:14px"><label>${T('notes.tagsLabel')}</label>
+        <input class="input" id="f-tags" value="${U.escapeHtml((n.tags||[]).join('، '))}" placeholder="${T('notes.tagsPlaceholder')}"></div>
       <div class="modal-actions">
-        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} حذف</button>` : ''}
+        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} ${T('common.delete')}</button>` : ''}
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="btn-cancel">انصراف</button>
-        <button class="btn btn-primary" id="btn-save">ذخیره</button>
+        <button class="btn btn-ghost" id="btn-cancel">${T('common.cancel')}</button>
+        <button class="btn btn-primary" id="btn-save">${T('common.save')}</button>
       </div>
     `, { className: 'modal-lg' });
 
@@ -103,7 +104,7 @@ Z.views.notes = (function () {
     overlay.querySelector('#m-close').onclick = () => U.closeModal(overlay);
     overlay.querySelector('#btn-cancel').onclick = () => U.closeModal(overlay);
     if (id) overlay.querySelector('#btn-delete').onclick = () => {
-      const dd = data(); dd.notes = dd.notes.filter(x=>x.id!==id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast('یادداشت حذف شد');
+      const dd = data(); dd.notes = dd.notes.filter(x=>x.id!==id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast(T('notes.deleted'));
     };
     overlay.querySelector('#btn-save').onclick = () => {
       const title = overlay.querySelector('#f-title').value.trim();
@@ -113,9 +114,9 @@ Z.views.notes = (function () {
       const wasNew = !id;
       if (id) Object.assign(n, { title, bodyHtml, tags, pinned, updatedAt: Date.now() });
       else dd.notes.push({ id:U.genId(), title, bodyHtml, tags, pinned, createdAt: Date.now(), updatedAt: Date.now() });
-      if (wasNew) Z.store.bumpActivity(pid(), 'notes', U.todayISO(), 1);
+      if (wasNew) { Z.store.bumpActivity(pid(), 'notes', U.todayISO(), 1); Z.gamification.checkAndUnlock(pid()); }
       save(); U.closeModal(overlay); Z.app.refreshView();
-      U.toast(id?'یادداشت ذخیره شد':'یادداشت اضافه شد');
+      U.toast(id?T('notes.saved'):T('notes.added'));
     };
   }
 

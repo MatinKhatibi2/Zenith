@@ -1,13 +1,25 @@
 /* =========================================================
-   Z.auth — local profile onboarding & switching
-   No server: "accounts" are local profiles stored on-device.
+   Z.auth — local profile onboarding & switching — bilingual
    ========================================================= */
 window.Z = window.Z || {};
 
 Z.auth = (function () {
   const U = Z.utils;
+  const T = Z.i18n.t;
 
-  function initial(name) { return (name || '؟').trim().charAt(0).toUpperCase(); }
+  function initial(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
+
+  function langSwitcher() {
+    return `<div class="chip-select" id="auth-lang-switch" style="justify-content:center;margin-bottom:18px">
+      <div class="chip ${Z.i18n.isFa()?'selected':''}" data-l="fa">فارسی</div>
+      <div class="chip ${!Z.i18n.isFa()?'selected':''}" data-l="en">English</div>
+    </div>`;
+  }
+  function wireLangSwitcher(root, rerender) {
+    const el = root.querySelector('#auth-lang-switch');
+    if (!el) return;
+    el.querySelectorAll('.chip').forEach(c => c.onclick = () => { Z.i18n.setLang(c.dataset.l); rerender(); });
+  }
 
   function render(root) {
     const profiles = Z.store.getProfiles();
@@ -19,24 +31,26 @@ Z.auth = (function () {
     root.innerHTML = `
       <div class="auth-screen">
         <div class="auth-card">
+          ${langSwitcher()}
           <img src="icons/icon-128.png" class="auth-logo" alt="Zenith">
-          <div class="auth-title">خوش برگشتی 👋</div>
-          <div class="auth-sub">پروفایل خودت رو انتخاب کن</div>
+          <div class="auth-title">${T('auth.welcomeBack')}</div>
+          <div class="auth-sub">${T('auth.pickProfile')}</div>
           <div class="profile-pick-list">
             ${profiles.map(p => `
               <div class="profile-pick-item" data-id="${p.id}">
                 <div class="profile-avatar" style="width:40px;height:40px;font-size:15px;background:${p.avatarColor}">${U.escapeHtml(initial(p.name))}</div>
                 <div style="flex:1">
                   <div style="font-weight:700;font-size:14px">${U.escapeHtml(p.name)}</div>
-                  <div style="font-size:11.5px;color:var(--text-muted)">${p.pinHash ? 'دارای پین امنیتی' : 'بدون پین'}</div>
+                  <div style="font-size:11.5px;color:var(--text-muted)">${p.pinHash ? T('auth.hasPin') : T('auth.noPin')}</div>
                 </div>
                 <div style="color:var(--text-faint)">${U.icon('chevronDown')}</div>
               </div>
             `).join('')}
           </div>
-          <button class="btn btn-ghost btn-block" id="btn-add-profile">${U.icon('plus')} افزودن پروفایل جدید</button>
+          <button class="btn btn-ghost btn-block" id="btn-add-profile">${U.icon('plus')} ${T('auth.addProfile')}</button>
         </div>
       </div>`;
+    wireLangSwitcher(root, () => renderPicker(root, profiles));
     root.querySelectorAll('.profile-pick-item').forEach(el => {
       el.addEventListener('click', () => {
         const profile = profiles.find(p => p.id === el.dataset.id);
@@ -49,13 +63,13 @@ Z.auth = (function () {
 
   function promptPin(root, profile) {
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">ورود پین — ${U.escapeHtml(profile.name)}</div>
+      <div class="modal-head"><div class="modal-title">${T('auth.enterPin')} — ${U.escapeHtml(profile.name)}</div>
         <button class="icon-btn" id="pin-close">${U.icon('x')}</button></div>
-      <div class="field"><label>پین ۴ رقمی</label>
+      <div class="field"><label>${T('auth.pin4')}</label>
         <input type="password" inputmode="numeric" maxlength="8" class="input" id="pin-input" autofocus placeholder="••••"></div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="pin-cancel">انصراف</button>
-        <button class="btn btn-primary" id="pin-submit">ورود</button>
+        <button class="btn btn-ghost" id="pin-cancel">${T('common.cancel')}</button>
+        <button class="btn btn-primary" id="pin-submit">${T('auth.login')}</button>
       </div>`);
     overlay.querySelector('#pin-close').onclick = () => U.closeModal(overlay);
     overlay.querySelector('#pin-cancel').onclick = () => U.closeModal(overlay);
@@ -63,7 +77,7 @@ Z.auth = (function () {
       const val = overlay.querySelector('#pin-input').value;
       const ok = await Z.store.verifyPin(profile.id, val);
       if (ok) { U.closeModal(overlay); login(profile.id); }
-      else U.toast('پین اشتباهه، دوباره امتحان کن');
+      else U.toast(T('auth.wrongPin'));
     };
     overlay.querySelector('#pin-submit').onclick = submit;
     overlay.querySelector('#pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
@@ -73,23 +87,23 @@ Z.auth = (function () {
     root.innerHTML = `
       <div class="auth-screen">
         <div class="auth-card">
+          ${langSwitcher()}
           <img src="icons/icon-128.png" class="auth-logo" alt="Zenith">
-          <div class="auth-title">${first ? 'به Zenith خوش اومدی 🌱' : 'پروفایل جدید'}</div>
-          <div class="auth-sub">${first ? 'دستیار شخصی رشد، وظایف، عادت‌ها و مالی‌ات' : 'یک اسم برای پروفایل جدید انتخاب کن'}</div>
-          <div class="field"><label>اسمت چیه؟</label>
-            <input class="input" id="name-input" placeholder="مثلاً سارا" autofocus></div>
-          <div class="field"><label>پین امنیتی (اختیاری، ۴ رقم)</label>
-            <input class="input" id="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="اگه چند نفر از این دستگاه استفاده می‌کنید پیشنهاد میشه"></div>
-          <button class="btn btn-primary btn-block" id="btn-create">${U.icon('sprout')} شروع کن</button>
-          ${!first ? `<button class="btn btn-ghost btn-block" id="btn-back" style="margin-top:8px">بازگشت</button>` : ''}
-          <div class="auth-sub" style="margin-top:16px;font-size:11.5px">
-            همه‌ی اطلاعاتت فقط روی همین دستگاه ذخیره میشه؛ هیچ سروری در کار نیست. از تنظیمات می‌تونی بعداً پشتیبان بگیری.
-          </div>
+          <div class="auth-title">${first ? T('auth.welcomeTitle') : T('auth.newProfileTitle')}</div>
+          <div class="auth-sub">${first ? T('auth.welcomeSub') : T('auth.newProfileSub')}</div>
+          <div class="field"><label>${T('auth.whatsYourName')}</label>
+            <input class="input" id="name-input" placeholder="${T('auth.namePlaceholder')}" autofocus></div>
+          <div class="field"><label>${T('auth.pinOptional')}</label>
+            <input class="input" id="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="${T('auth.pinHint')}"></div>
+          <button class="btn btn-primary btn-block" id="btn-create">${U.icon('sprout')} ${T('auth.getStarted')}</button>
+          ${!first ? `<button class="btn btn-ghost btn-block" id="btn-back" style="margin-top:8px">${T('auth.back')}</button>` : ''}
+          <div class="auth-sub" style="margin-top:16px;font-size:11.5px">${T('auth.privacyNote')}</div>
         </div>
       </div>`;
+    wireLangSwitcher(root, () => renderCreate(root, { first, profiles }));
     root.querySelector('#btn-create').addEventListener('click', async () => {
       const name = root.querySelector('#name-input').value.trim();
-      if (!name) { U.toast('لطفاً یه اسم وارد کن'); return; }
+      if (!name) { U.toast(T('auth.enterName')); return; }
       const pin = root.querySelector('#pin-input').value.trim();
       const profile = await Z.store.createProfile({ name, pin: pin || null });
       login(profile.id);

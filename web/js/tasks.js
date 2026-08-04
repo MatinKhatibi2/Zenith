@@ -1,11 +1,12 @@
 /* =========================================================
-   Z.views.tasks — Task Manager (list + kanban board)
+   Z.views.tasks — Task Manager (list + kanban board) — bilingual
    ========================================================= */
 window.Z = window.Z || {};
 Z.views = Z.views || {};
 
 Z.views.tasks = (function () {
   const U = Z.utils;
+  const T = Z.i18n.t;
   let state = { mode: 'list', filter: 'all', q: '' };
 
   function pid() { return Z.store.getActiveProfileId(); }
@@ -17,25 +18,24 @@ Z.views.tasks = (function () {
     return c ? c.color : 'var(--text-faint)';
   }
 
-  const PRIORITY_LABEL = { low: 'کم', med: 'متوسط', high: 'بالا', urgent: 'فوری' };
+  const PRIORITY_KEYS = ['low','med','high','urgent'];
   const PRIORITY_BADGE = { low: 'badge-low', med: 'badge-med', high: 'badge-high', urgent: 'badge-urgent' };
 
   function render(root) {
-    const d = data();
     root.innerHTML = `
       <div class="section-head" style="margin-bottom:10px">
         <div class="filter-tabs" id="view-toggle" style="margin:0">
-          <div class="filter-tab ${state.mode==='list'?'active':''}" data-mode="list">لیست</div>
-          <div class="filter-tab ${state.mode==='board'?'active':''}" data-mode="board">بورد</div>
+          <div class="filter-tab ${state.mode==='list'?'active':''}" data-mode="list">${T('tasks.list')}</div>
+          <div class="filter-tab ${state.mode==='board'?'active':''}" data-mode="board">${T('tasks.board')}</div>
         </div>
-        <button class="btn btn-primary btn-sm" id="btn-add-task">${U.icon('plus')} وظیفه جدید</button>
+        <button class="btn btn-primary btn-sm" id="btn-add-task">${U.icon('plus')} ${T('tasks.new')}</button>
       </div>
       <div class="input-row" style="margin-bottom:14px">
-        <input class="input" id="task-search" placeholder="جستجوی وظیفه…" value="${U.escapeHtml(state.q)}">
+        <input class="input" id="task-search" placeholder="${T('tasks.search')}" value="${U.escapeHtml(state.q)}">
       </div>
       ${state.mode === 'list' ? `
         <div class="filter-tabs" id="filter-tabs">
-          ${['all','today','week','overdue','done'].map(f => `<div class="filter-tab ${state.filter===f?'active':''}" data-filter="${f}">${filterLabel(f)}</div>`).join('')}
+          ${['all','today','week','overdue','done'].map(f => `<div class="filter-tab ${state.filter===f?'active':''}" data-filter="${f}">${T('tasks.filter.'+f)}</div>`).join('')}
         </div>
         <div id="task-list-holder"></div>
       ` : `<div class="task-board" id="task-board"></div>`}
@@ -50,10 +50,6 @@ Z.views.tasks = (function () {
     renderBody(root);
   }
 
-  function filterLabel(f) {
-    return { all:'همه', today:'امروز', week:'این هفته', overdue:'دیرکرد', done:'انجام‌شده' }[f];
-  }
-
   function matchesQuery(t) { return !state.q || t.title.includes(state.q) || (t.notes||'').includes(state.q); }
 
   function filteredTasks() {
@@ -64,7 +60,6 @@ Z.views.tasks = (function () {
     else if (state.filter === 'week') list = list.filter(t => t.dueDate && U.isoDiffDays(t.dueDate, today) >= 0 && U.isoDiffDays(t.dueDate, today) <= 7 && t.status !== 'done');
     else if (state.filter === 'overdue') list = list.filter(t => t.dueDate && t.dueDate < today && t.status !== 'done');
     else if (state.filter === 'done') list = list.filter(t => t.status === 'done');
-    else list = list.filter(t => t.status !== 'done' || true); // 'all' shows everything, sorted below
     return list.sort((a,b) => {
       if (state.filter === 'all') { if ((a.status==='done') !== (b.status==='done')) return a.status==='done' ? 1 : -1; }
       const ad = a.dueDate || '9999', bd = b.dueDate || '9999';
@@ -90,7 +85,7 @@ Z.views.tasks = (function () {
   }
 
   function emptyState() {
-    return `<div class="empty-state">${U.icon('tasks')}<div class="empty-state-title">فعلاً وظیفه‌ای نیست</div><div>یه وظیفه جدید اضافه کن تا شروع کنی</div></div>`;
+    return `<div class="empty-state">${U.icon('tasks')}<div class="empty-state-title">${T('tasks.emptyTitle')}</div><div>${T('tasks.emptySub')}</div></div>`;
   }
 
   function rowHtml(t) {
@@ -104,9 +99,9 @@ Z.views.tasks = (function () {
           <div class="task-row-title ${done?'done':''}">${U.escapeHtml(t.title)}</div>
           <div class="task-row-meta">
             ${t.category ? `<span class="badge" style="background:${catColor(t.category)}22;color:${catColor(t.category)}"><span class="dot" style="background:${catColor(t.category)}"></span>${U.escapeHtml(t.category)}</span>` : ''}
-            <span class="badge ${PRIORITY_BADGE[t.priority]}">${PRIORITY_LABEL[t.priority]}</span>
+            <span class="badge ${PRIORITY_BADGE[t.priority]}">${T('tasks.priority.'+t.priority)}</span>
             ${t.dueDate ? `<span class="text-muted" style="font-size:11.5px">${U.icon('bell')} ${U.relativeDayLabel(t.dueDate)}${t.dueTime ? ' · '+U.faTime(t.dueTime) : ''}</span>` : ''}
-            ${subTotal ? `<span class="text-muted" style="font-size:11.5px">${U.faNum(subDone)}/${U.faNum(subTotal)} مرحله</span>` : ''}
+            ${subTotal ? `<span class="text-muted" style="font-size:11.5px">${U.faNum(subDone)}/${U.faNum(subTotal)} ${T('tasks.step')}</span>` : ''}
           </div>
         </div>
       </div>`;
@@ -114,7 +109,7 @@ Z.views.tasks = (function () {
 
   function renderBoard(holder) {
     if (!holder) return;
-    const cols = [ ['todo','در انتظار'], ['doing','در حال انجام'], ['done','انجام‌شده'] ];
+    const cols = [ ['todo', T('tasks.col.todo')], ['doing', T('tasks.col.doing')], ['done', T('tasks.col.done')] ];
     const tasks = data().tasks.filter(matchesQuery);
     holder.innerHTML = cols.map(([status,label]) => {
       const items = tasks.filter(t => t.status === status);
@@ -127,11 +122,11 @@ Z.views.tasks = (function () {
                 <div class="task-card-title ${status==='done'?'done':''}">${U.escapeHtml(t.title)}</div>
                 <div class="task-card-meta">
                   ${t.category ? `<span class="dot" style="background:${catColor(t.category)}"></span><span>${U.escapeHtml(t.category)}</span>` : ''}
-                  <span class="badge ${PRIORITY_BADGE[t.priority]}">${PRIORITY_LABEL[t.priority]}</span>
+                  <span class="badge ${PRIORITY_BADGE[t.priority]}">${T('tasks.priority.'+t.priority)}</span>
                 </div>
                 ${t.dueDate ? `<div class="task-card-meta" style="margin-top:5px">${U.icon('bell')} ${U.relativeDayLabel(t.dueDate)}</div>` : ''}
               </div>
-            `).join('') || `<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">خالی</div>`}
+            `).join('') || `<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">${T('common.empty')}</div>`}
           </div>
         </div>`;
     }).join('');
@@ -162,43 +157,43 @@ Z.views.tasks = (function () {
     if (!t) return;
     const wasDone = t.status === 'done';
     t.status = status;
-    if (status === 'done' && !wasDone) { t.completedAt = Date.now(); Z.store.bumpActivity(pid(), 'tasks', U.todayISO(), 1); }
+    if (status === 'done' && !wasDone) { t.completedAt = Date.now(); Z.store.bumpActivity(pid(), 'tasks', U.todayISO(), 1); Z.gamification.checkAndUnlock(pid()); }
     if (status !== 'done' && wasDone) { Z.store.bumpActivity(pid(), 'tasks', (t.completedAt ? U.dateToISO(new Date(t.completedAt)) : U.todayISO()), -1); }
     save();
     Z.app.refreshView();
   }
 
-  function openTaskModal(id) {
+  function openTaskModal(id, presetDate) {
     const d = data();
-    const t = id ? d.tasks.find(t => t.id === id) : { id: null, title:'', notes:'', category: d.taskCategories[0].name, priority:'med', status:'todo', dueDate:'', dueTime:'', subtasks:[] };
+    const t = id ? d.tasks.find(t => t.id === id) : { id: null, title:'', notes:'', category: d.taskCategories[0].name, priority:'med', status:'todo', dueDate: presetDate||'', dueTime:'', subtasks:[] };
     const overlay = U.openModal(`
-      <div class="modal-head"><div class="modal-title">${id?'ویرایش وظیفه':'وظیفه جدید'}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
-      <div class="field"><label>عنوان</label><input class="input" id="f-title" value="${U.escapeHtml(t.title)}" placeholder="مثلاً تماس با مشتری"></div>
-      <div class="field"><label>یادداشت (اختیاری)</label><textarea class="textarea" id="f-notes" placeholder="جزئیات بیشتر…">${U.escapeHtml(t.notes||'')}</textarea></div>
-      <div class="field"><label>دسته‌بندی</label>
+      <div class="modal-head"><div class="modal-title">${id?T('tasks.editTitle'):T('tasks.newTitle')}</div><button class="icon-btn" id="m-close">${U.icon('x')}</button></div>
+      <div class="field"><label>${T('tasks.titleLabel')}</label><input class="input" id="f-title" value="${U.escapeHtml(t.title)}" placeholder="${T('tasks.titlePlaceholder')}"></div>
+      <div class="field"><label>${T('tasks.notesLabel')}</label><textarea class="textarea" id="f-notes" placeholder="${T('tasks.notesPlaceholder')}">${U.escapeHtml(t.notes||'')}</textarea></div>
+      <div class="field"><label>${T('tasks.categoryLabel')}</label>
         <div class="chip-select" id="f-cats">
           ${d.taskCategories.map(c => `<div class="chip ${t.category===c.name?'selected':''}" data-name="${U.escapeHtml(c.name)}" style="${t.category===c.name?`background:${c.color};border-color:${c.color}`:''}">${U.escapeHtml(c.name)}</div>`).join('')}
-          <div class="chip" id="chip-add-cat">+ جدید</div>
+          <div class="chip" id="chip-add-cat">${T('common.new')}</div>
         </div>
       </div>
-      <div class="field"><label>اولویت</label>
+      <div class="field"><label>${T('tasks.priorityLabel')}</label>
         <div class="chip-select" id="f-priority">
-          ${Object.entries(PRIORITY_LABEL).map(([k,label]) => `<div class="chip ${t.priority===k?'selected':''}" data-p="${k}">${label}</div>`).join('')}
+          ${PRIORITY_KEYS.map(k => `<div class="chip ${t.priority===k?'selected':''}" data-p="${k}">${T('tasks.priority.'+k)}</div>`).join('')}
         </div>
       </div>
       <div class="input-row">
-        <div class="field" style="flex:1"><label>تاریخ سررسید</label><input class="input" type="date" id="f-date" value="${t.dueDate||''}"></div>
-        <div class="field" style="flex:1"><label>ساعت (اختیاری)</label><input class="input" type="time" id="f-time" value="${t.dueTime||''}"></div>
+        <div class="field" style="flex:1"><label>${T('tasks.dueDate')}</label><input class="input" type="date" id="f-date" value="${t.dueDate||''}"></div>
+        <div class="field" style="flex:1"><label>${T('tasks.dueTime')}</label><input class="input" type="time" id="f-time" value="${t.dueTime||''}"></div>
       </div>
-      <div class="field"><label>مراحل فرعی</label>
+      <div class="field"><label>${T('tasks.subtasks')}</label>
         <div id="subtask-list">${(t.subtasks||[]).map(s => subtaskRowHtml(s)).join('')}</div>
-        <button class="btn btn-ghost btn-sm" id="btn-add-subtask" style="margin-top:6px">${U.icon('plus')} افزودن مرحله</button>
+        <button class="btn btn-ghost btn-sm" id="btn-add-subtask" style="margin-top:6px">${U.icon('plus')} ${T('tasks.addStep')}</button>
       </div>
       <div class="modal-actions">
-        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} حذف</button>` : ''}
+        ${id ? `<button class="btn btn-danger" id="btn-delete">${U.icon('trash')} ${T('common.delete')}</button>` : ''}
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="btn-cancel">انصراف</button>
-        <button class="btn btn-primary" id="btn-save">ذخیره</button>
+        <button class="btn btn-ghost" id="btn-cancel">${T('common.cancel')}</button>
+        <button class="btn btn-primary" id="btn-save">${T('common.save')}</button>
       </div>
     `);
 
@@ -225,6 +220,7 @@ Z.views.tasks = (function () {
     overlay.querySelector('#btn-add-subtask').onclick = () => { subtasks.push({ id: U.genId(), title:'', done:false }); refreshSubtasks(); };
     overlay.querySelector('#m-close').onclick = () => U.closeModal(overlay);
     overlay.querySelector('#btn-cancel').onclick = () => U.closeModal(overlay);
+
     function wireCatChips() {
       overlay.querySelectorAll('#f-cats .chip[data-name]').forEach(chip => chip.onclick = () => {
         selectedCategory = chip.dataset.name;
@@ -234,7 +230,7 @@ Z.views.tasks = (function () {
       });
       const addBtn = overlay.querySelector('#chip-add-cat');
       if (addBtn) addBtn.onclick = () => {
-        const name = prompt('اسم دسته‌بندی جدید؟');
+        const name = prompt(T('tasks.newCategoryPrompt'));
         if (!name || !name.trim()) return;
         const dd = data();
         const clean = name.trim();
@@ -251,17 +247,18 @@ Z.views.tasks = (function () {
       };
     }
     wireCatChips();
+
     overlay.querySelectorAll('#f-priority .chip').forEach(chip => chip.onclick = () => {
       selectedPriority = chip.dataset.p;
       overlay.querySelectorAll('#f-priority .chip').forEach(c => c.classList.remove('selected'));
       chip.classList.add('selected');
     });
     if (id) overlay.querySelector('#btn-delete').onclick = () => {
-      const dd = data(); dd.tasks = dd.tasks.filter(x => x.id !== id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast('وظیفه حذف شد');
+      const dd = data(); dd.tasks = dd.tasks.filter(x => x.id !== id); save(); U.closeModal(overlay); Z.app.refreshView(); U.toast(T('tasks.deleted'));
     };
     overlay.querySelector('#btn-save').onclick = () => {
       const title = overlay.querySelector('#f-title').value.trim();
-      if (!title) { U.toast('عنوان رو وارد کن'); return; }
+      if (!title) { U.toast(T('tasks.enterTitle')); return; }
       const dd = data();
       const payload = {
         title,
@@ -280,17 +277,17 @@ Z.views.tasks = (function () {
       save();
       U.closeModal(overlay);
       Z.app.refreshView();
-      U.toast(id ? 'وظیفه به‌روزرسانی شد' : 'وظیفه اضافه شد');
+      U.toast(id ? T('tasks.updated') : T('tasks.added'));
     };
   }
 
   function subtaskRowHtml(s) {
     return `<div class="subtask-row">
       <div class="task-checkbox ${s.done?'checked':''}" data-sid="${s.id}">${U.icon('check')}</div>
-      <input type="text" class="input" style="padding:5px 9px;font-size:12.5px" data-sid="${s.id}" value="${U.escapeHtml(s.title)}" placeholder="عنوان مرحله">
+      <input type="text" class="input" style="padding:5px 9px;font-size:12.5px" data-sid="${s.id}" value="${U.escapeHtml(s.title)}" placeholder="${T('tasks.stepPlaceholder')}">
       <button class="icon-btn sub-del" data-sid="${s.id}" style="width:28px;height:28px">${U.icon('x')}</button>
     </div>`;
   }
 
-  return { render };
+  return { render, openTaskModal };
 })();

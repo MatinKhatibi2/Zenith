@@ -69,27 +69,39 @@ Z.store = (function () {
 
   /* ---------------- Per-profile data ---------------- */
   function defaultData() {
+    const fa = !(window.Z && Z.i18n && !Z.i18n.isFa());
     return {
       version: 1,
       tasks: [],
-      taskCategories: [
+      taskCategories: fa ? [
         { name: 'کار', color: '#3E6E8E' },
         { name: 'شخصی', color: '#C9962E' },
         { name: 'درس', color: '#2F5D50' },
         { name: 'سلامتی', color: '#A8452F' },
         { name: 'خانه', color: '#7A5C2E' },
+      ] : [
+        { name: 'Work', color: '#3E6E8E' },
+        { name: 'Personal', color: '#C9962E' },
+        { name: 'Study', color: '#2F5D50' },
+        { name: 'Health', color: '#A8452F' },
+        { name: 'Home', color: '#7A5C2E' },
       ],
       habits: [],
       notes: [],
       finance: {
         transactions: [], budgets: [],
-        expenseCategories: ['خوراک','حمل‌ونقل','خرید','قبض‌ها','سرگرمی','سلامت','مسکن','متفرقه'],
-        incomeCategories: ['حقوق','فریلنس','هدیه','سرمایه‌گذاری','متفرقه'],
+        expenseCategories: fa
+          ? ['خوراک','حمل‌ونقل','خرید','قبض‌ها','سرگرمی','سلامت','مسکن','متفرقه']
+          : ['Food','Transport','Shopping','Bills','Entertainment','Health','Housing','Other'],
+        incomeCategories: fa
+          ? ['حقوق','فریلنس','هدیه','سرمایه‌گذاری','متفرقه']
+          : ['Salary','Freelance','Gift','Investment','Other'],
       },
       pomodoro: { sessions: [], settings: { focusMin: 25, shortBreakMin: 5, longBreakMin: 15, roundsBeforeLongBreak: 4 } },
       alarms: [],
-      settings: { theme: 'light', apiKey: '', aiModel: 'claude-haiku-4-5-20251001', currency: 'تومان', notifPermAsked: false },
+      settings: { theme: 'light', apiKey: '', aiModel: 'claude-haiku-4-5-20251001', currency: fa ? 'تومان' : '$', notifPermAsked: false },
       activity: {}, // { "YYYY-MM-DD": {tasks:0,habits:0,pomodoros:0,notes:0,tx:0} }
+      gamification: { xp: 0, unlockedBadges: [] },
       chatHistory: [], // [{role,content,ts}]
     };
   }
@@ -103,6 +115,7 @@ Z.store = (function () {
     merged.finance.incomeCategories = (data.finance && data.finance.incomeCategories && data.finance.incomeCategories.length) ? data.finance.incomeCategories : d.finance.incomeCategories;
     merged.pomodoro = { ...d.pomodoro, ...(data.pomodoro || {}), settings: { ...d.pomodoro.settings, ...((data.pomodoro||{}).settings || {}) } };
     merged.settings = { ...d.settings, ...(data.settings || {}) };
+    merged.gamification = { ...d.gamification, ...(data.gamification || {}) };
     return merged;
   }
 
@@ -128,12 +141,16 @@ Z.store = (function () {
   }
 
   /* ---------------- Activity log (feeds Growth Grid + charts + evaluation) ---------------- */
+  const XP_TABLE = { tasks: 10, habits: 8, pomodoros: 15, notes: 5, tx: 3 };
   function bumpActivity(profileId, key, dateISO, delta) {
     delta = delta == null ? 1 : delta;
     const data = loadData(profileId);
     const day = dateISO || Z.utils.todayISO();
     if (!data.activity[day]) data.activity[day] = { tasks:0, habits:0, pomodoros:0, notes:0, tx:0 };
     data.activity[day][key] = Math.max(0, (data.activity[day][key] || 0) + delta);
+    if (delta > 0 && XP_TABLE[key]) {
+      data.gamification.xp = (data.gamification.xp || 0) + XP_TABLE[key] * delta;
+    }
     touch(profileId);
   }
 

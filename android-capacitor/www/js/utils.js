@@ -11,9 +11,10 @@ Z.utils = (function () {
     return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
   }
 
-  /* ---------- Persian digits ---------- */
+  /* ---------- Persian digits (language-aware) ---------- */
   const FA_DIGITS = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
   function faNum(input) {
+    if (window.Z && Z.i18n && !Z.i18n.isFa()) return String(input);
     return String(input).replace(/[0-9]/g, d => FA_DIGITS[+d]);
   }
 
@@ -62,6 +63,8 @@ Z.utils = (function () {
   const JALALI_MONTHS = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
   const WEEKDAYS_FA = ['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
   const WEEKDAYS_FA_SHORT = ['ی','د','س','چ','پ','ج','ش'];
+  const GREGORIAN_MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const WEEKDAYS_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   // ISO date string (YYYY-MM-DD) helpers — internal storage stays Gregorian/ISO for easy sorting/math
   function todayISO() { return dateToISO(new Date()); }
@@ -87,21 +90,33 @@ Z.utils = (function () {
   function faDateFromISO(iso, opts) {
     opts = opts || {};
     const d = new Date(iso + 'T00:00:00');
+    if (window.Z && Z.i18n && !Z.i18n.isFa()) {
+      if (opts.short) return `${d.getDate()} ${GREGORIAN_MONTHS_EN[d.getMonth()].slice(0,3)}`;
+      if (opts.numeric) return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+      return `${GREGORIAN_MONTHS_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
     const [jy, jm, jd] = gregorianToJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
     if (opts.short) return `${faNum(jd)} ${JALALI_MONTHS[jm-1]}`;
     if (opts.numeric) return `${faNum(jy)}/${faNum(String(jm).padStart(2,'0'))}/${faNum(String(jd).padStart(2,'0'))}`;
     return `${faNum(jd)} ${JALALI_MONTHS[jm-1]} ${faNum(jy)}`;
   }
+  function faMonthName(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    if (window.Z && Z.i18n && !Z.i18n.isFa()) return GREGORIAN_MONTHS_EN[d.getMonth()].slice(0,3);
+    const [, jm] = gregorianToJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+    return JALALI_MONTHS[jm-1];
+  }
   function faWeekdayFromISO(iso, short) {
-    const idxIr = isoWeekdayIrIndex(iso); // 0=Sat..6=Fri
     const jsDay = new Date(iso+'T00:00:00').getDay();
+    if (window.Z && Z.i18n && !Z.i18n.isFa()) return short ? WEEKDAYS_EN[jsDay].slice(0,3) : WEEKDAYS_EN[jsDay];
     return short ? WEEKDAYS_FA_SHORT[jsDay] : WEEKDAYS_FA[jsDay];
   }
   function relativeDayLabel(iso) {
     const diff = isoDiffDays(iso, todayISO());
-    if (diff === 0) return 'امروز';
-    if (diff === 1) return 'فردا';
-    if (diff === -1) return 'دیروز';
+    const T = (window.Z && Z.i18n) ? Z.i18n.t : (k=>k);
+    if (diff === 0) return T('common.today');
+    if (diff === 1) return T('common.tomorrow');
+    if (diff === -1) return T('common.yesterday');
     if (diff > 1 && diff < 7) return faWeekdayFromISO(iso);
     return faDateFromISO(iso, { short: true });
   }
@@ -115,7 +130,7 @@ Z.utils = (function () {
 
   /* ---------- Formatting ---------- */
   function formatCurrency(n, currency) {
-    currency = currency || 'تومان';
+    currency = currency || ((window.Z && Z.i18n && !Z.i18n.isFa()) ? '$' : 'تومان');
     const rounded = Math.round(n);
     const str = Math.abs(rounded).toLocaleString('en-US');
     return `${rounded < 0 ? '−' : ''}${faNum(str)} ${currency}`;
@@ -223,16 +238,46 @@ Z.utils = (function () {
     chevronDown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
     x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+    calendar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    chevronLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>',
+    chevronRight:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>',
   };
   function icon(name) { return ICONS[name] || ''; }
+
+  /* ---------- Celebration burst (used by gamification: level-up, badges, streaks) ---------- */
+  function celebrate(opts) {
+    opts = opts || {};
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const count = opts.count || 16;
+    const emojis = opts.emojis || ['🌿','✨','🌟','💛','🍀'];
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden;';
+    document.body.appendChild(container);
+    const startX = opts.originX != null ? opts.originX : window.innerWidth/2;
+    const startY = opts.originY != null ? opts.originY : window.innerHeight/2;
+    for (let i=0;i<count;i++){
+      const el = document.createElement('div');
+      el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+      const angle = Math.random()*Math.PI*2;
+      const dist = 70 + Math.random()*170;
+      const dx = Math.cos(angle)*dist, dy = Math.sin(angle)*dist - 50;
+      el.style.cssText = `position:absolute;left:${startX}px;top:${startY}px;font-size:${14+Math.random()*16}px;transform:translate(-50%,-50%);opacity:1;transition:transform 950ms cubic-bezier(.15,.8,.3,1), opacity 950ms ease;will-change:transform,opacity;`;
+      container.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${(Math.random()*360)|0}deg)`;
+        el.style.opacity = '0';
+      });
+    }
+    setTimeout(() => container.remove(), 1050);
+  }
 
   return {
     genId, faNum, gregorianToJalali, jalaliToGregorian,
     JALALI_MONTHS, WEEKDAYS_FA, WEEKDAYS_FA_SHORT,
     todayISO, dateToISO, isoAddDays, isoDiffDays, isoWeekdayIrIndex,
-    faDateFromISO, faWeekdayFromISO, relativeDayLabel, nowHM, faTime,
+    faDateFromISO, faWeekdayFromISO, faMonthName, relativeDayLabel, nowHM, faTime,
     formatCurrency, formatCompact, escapeHtml,
     debounce, clamp, uniq, sha256,
-    toast, openModal, closeModal, icon,
+    toast, openModal, closeModal, icon, celebrate,
   };
 })();
